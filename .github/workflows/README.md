@@ -10,7 +10,7 @@ In your GitHub repo, import these workflows by adding small yaml files to the `.
 
 ### Scan for Secrets and Security issues
 
-[![Semgrep](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/semgrep.yaml/badge.svg)](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/semgrep.yaml)
+[![Semgrep](https://github.com/buluma/GitHub-Actions/actions/workflows/semgrep.yaml/badge.svg)](https://github.com/buluma/GitHub-Actions/actions/workflows/semgrep.yaml)
 Alerts appear under Security -> Code scanning alerts.
 
 Create `.github/workflows/semgrep.yaml`:
@@ -18,7 +18,7 @@ Create `.github/workflows/semgrep.yaml`:
 on: [push]
 jobs:
   semgrep:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/semgrep.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/semgrep.yaml@master
 ```
 
 ### Analyze your Terraform code security & best practices
@@ -31,7 +31,7 @@ Create `.github/workflows/tfsec.yaml`:
 on: [push]
 jobs:
   tfsec:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/tfsec.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/tfsec.yaml@master
 ```
 
 ### Docker Build and push to DockerHub
@@ -43,7 +43,7 @@ Create `.github/workflows/docker_build.yaml`:
 on: [push]
 jobs:
   docker_build:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/docker_build.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/docker_build.yaml@master
     with:
       repo: harisekhon/bash-tools  # DockerHub user/repo
       tags: latest ubuntu          # builds, tags as harisekhon/bash-tools:latest and harisekhon/bash-tools:ubuntu and pushes to DockerHub
@@ -61,7 +61,7 @@ Create `.github/workflows/docker_build_aws_ecr.yaml`:
 on: [push]
 jobs:
   docker_build:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/docker_build_aws_ecr.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/docker_build_aws_ecr.yaml@master
     with:
       repo: MY_ECR_REPO  # without the 'xxx.dkr.ecr.<region>.amazonaws.com' prefix
     secrets:
@@ -88,14 +88,14 @@ Supports multi-stage build caching using GHCR for intermediate layer caching sin
 
 ### Check for Broken URL Links
 
-[![URL Links](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/url_links.yaml/badge.svg)](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/url_links.yaml)
+[![URL Links](https://github.com/buluma/GitHub-Actions/actions/workflows/url_links.yaml/badge.svg)](https://github.com/buluma/GitHub-Actions/actions/workflows/url_links.yaml)
 
 Create `.github/workflows/url_links.yaml`:
 ```yaml
 on: [push]
 jobs:
   url_links:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/url_links.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/url_links.yaml@master
     with:
 
       # custom ignore inaccessible / internal / partially constructed links or those containing variables
@@ -118,7 +118,7 @@ jobs:
   merge:
     if: github.ref_name == 'production'
     name: Merge Production Branch to Staging Branch (hotfix backports)
-    uses: HariSekhon/GitHub-Actions/.github/workflows/merge-branch.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/merge-branch.yaml@master
     with:
       head: production  # from - optional - if omitted defaults to the trigger branch, which is always 'production' due to the if condition above
       base: staging     # to
@@ -139,15 +139,15 @@ permissions:
   security-events: write
 ```
 These 3 permissions are needed for workflows that report to GitHub Security tab, including:
-- [checkov.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/checkov.yaml)
-- [kics.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/kics.yaml)
-- [semgrep.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/semgrep.yaml)
-- [tfsec.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/tfsec.yaml)
-- [trivy_github.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/trivy_github.yaml)
+- [checkov.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/checkov.yaml)
+- [kics.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/kics.yaml)
+- [semgrep.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/semgrep.yaml)
+- [tfsec.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/tfsec.yaml)
+- [trivy_github.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/trivy_github.yaml)
 
 ### Linting Auto-fixers
 
-For workflows that lint-and-fix code, such as [terraform-fmt-write.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/terraform-fmt-write.yaml), you'll need to grant:
+For workflows that lint-and-fix code, such as [terraform-fmt-write.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/terraform-fmt-write.yaml), you'll need to grant:
 ```yaml
 permissions:
   contents: write       # if called by on: push
@@ -156,7 +156,7 @@ permissions:
 
 ### Creating or Commenting on Pull Requests
 
-For workflows that create or comment on PRs, such as [tfsec-pr-commenter.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/tfsec-pr-commenter.yaml) you'll need to grant:
+For workflows that create or comment on PRs, such as [tfsec-pr-commenter.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/tfsec-pr-commenter.yaml) you'll need to grant:
 ```yaml
 permissions:
   contents: read
@@ -165,7 +165,7 @@ permissions:
 
 ### Merging Pull Requests
 
-For workflows that merge PRs, such as [merge-branch.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/merge-branch.yaml) you'll need to grant:
+For workflows that merge PRs, such as [merge-branch.yaml](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/merge-branch.yaml) you'll need to grant:
 ```yaml
 permissions:
   contents: write

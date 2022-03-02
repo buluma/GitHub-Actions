@@ -1,21 +1,3 @@
-#
-#  Author: Hari Sekhon
-#  Date: 2022-01-31 16:49:05 +0000 (Mon, 31 Jan 2022)
-#
-#  vim:ts=2:sts=2:sw=2:et
-#
-#  https://github.com/HariSekhon/GitHub-Actions
-#
-#  If you're using my code you're welcome to connect with me on LinkedIn and optionally send me feedback
-#
-#  https://www.linkedin.com/in/harisekhon
-#
-
-# Split from trivy.yaml because differing versions between aquasec/trivy:latest docker image and aquasecurity/trivy-action@master github action cause breakage:
-#
-#   2022-02-02T11:58:59.840Z  ERROR Trivy version (0.22.0) is old. Update to the latest version.
-#   2022-02-02T11:58:59.840Z  FATAL DB error: database error: the version of DB schema doesn't match. Local DB: 2, Expected: 1
-
 ---
 name: Trivy GitHub Security Alerts
 
