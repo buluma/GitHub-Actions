@@ -40,7 +40,7 @@ jobs:
   validate:
     name: Validate CODEOWNERS
     runs-on: ubuntu-latest
-    container: harisekhon/bash-tools:latest
+    container: buluma/bash-tools:latest
     steps:
       - name: Environment
         run: env | sort
