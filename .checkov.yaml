@@ -10,7 +10,7 @@
 #
 # See master template at:
 #
-#   https://github.com/buluma/Templates/blob/master/.checkov.yaml
+#   https://github.com/harisekhon/Templates/blob/master/.checkov.yaml
 
 ---
 compact: true
