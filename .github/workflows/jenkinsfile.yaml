@@ -66,7 +66,7 @@ jobs:
         run: |
           cd "$JENKINS_HOME"
           git clone "$GITHUB_SERVER_URL/HariSekhon/DevOps-Bash-tools" bash-tools
-
+      # TODO: localise
       # Whatever constructs you want to validate in Jenkinsfile must have the corresponding plugins installed
       - name: Jenkins Install Plugins
         run: |

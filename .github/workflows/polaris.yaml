@@ -33,7 +33,7 @@ jobs:
         with:
           #version: 4.0.7
           #
-          # audit may fail on repos with JSON patches such as https://github.com/HariSekhon/Kubernetes-configs:
+          # audit may fail on repos with JSON patches such as https://github.com/buluma/Kubernetes-configs:
           #
           #   https://github.com/FairwindsOps/polaris/issues/667
           #
@@ -43,6 +43,6 @@ jobs:
           #
           # the better solution is to run Polaris inside Kubernetes, see polaris*.yaml in:
           #
-          #   https://github.com/HariSekhon/Kubernetes-configs
+          #   https://github.com/buluma/Kubernetes-configs
           #
           args: polaris audit --audit-path . -f pretty --only-show-failed-tests

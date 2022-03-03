@@ -39,7 +39,7 @@ jobs:
   check_json:
     name: Check JSON
     runs-on: ubuntu-latest
-    container: harisekhon/bash-tools:latest
+    container: buluma/bash-tools:latest
     steps:
       - name: Environment
         run: env | sort

@@ -10,7 +10,7 @@
 #
 # See master template at:
 #
-#   https://github.com/HariSekhon/Templates/blob/master/.checkov.yaml
+#   https://github.com/buluma/Templates/blob/master/.checkov.yaml
 
 ---
 compact: true
@@ -22,6 +22,6 @@ framework:
 no-guide: true
 output: cli
 quiet: true
-repo-id: buluma/GitHub-Actions  # what to report to Bridgecrew Cloud - without this gets annoying duplicate repos such as 'harisekhon_cli_repo/github-actions'
+repo-id: buluma/GitHub-Actions  # what to report to Bridgecrew Cloud - without this gets annoying duplicate repos such as 'buluma_cli_repo/github-actions'
 skip-suppressions: true
 soft-fail: true

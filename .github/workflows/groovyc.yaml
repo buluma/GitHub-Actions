@@ -24,9 +24,9 @@ jobs:
     #name: Groovy Compile
     runs-on: ubuntu-latest
     #container: groovy  # doesn't contain git and no sudo access
-    container: harisekhon/bash-tools:ubuntu
+    container: buluma/bash-tools:ubuntu
     steps:
-      # allows us to use check_groovyc.sh from the harisekhon/github docker image or the local HariSekhon/DevOps-Bash-tools git checkout further down
+      # allows us to use check_groovyc.sh from the buluma/github docker image or the local buluma/DevOps-Bash-tools git checkout further down
       - name: Setup PATH
         run: echo "PATH=$PWD/bash-tools:$PATH" >> "$GITHUB_ENV"
 
@@ -48,10 +48,10 @@ jobs:
         with:
           submodules: recursive  # requires Git 2.18+ to be installed first
 
-      # Uncomment if you need latest version from master before it is built into docker image harisekhon/bash-tools
+      # Uncomment if you need latest version from master before it is built into docker image buluma/bash-tools
       #- uses: actions/checkout@v2
       #  with:
-      #    repository: HariSekhon/DevOps-Bash-tools
+      #    repository: buluma/DevOps-Bash-tools
       #    #ref: master         # unset for default branch in case it changes in future
       #    submodules: recursive
       #    path: bash-tools

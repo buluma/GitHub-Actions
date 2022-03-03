@@ -55,7 +55,7 @@ defaults:
 env:
   # ${{ inputs.* }}               is set by workflow_call
   # ${{ github.events.inputs.* }} is set by workflow_dispatch
-  DOCKER_IMAGE: ${{ inputs.docker_image || github.event.inputs.docker_image || 'harisekhon/bash-tools' }}
+  DOCKER_IMAGE: ${{ inputs.docker_image || github.event.inputs.docker_image || 'buluma/bash-tools' }}
   DEBUG: ${{ inputs.debug || github.event.inputs.debug || '' }}
 
 jobs:

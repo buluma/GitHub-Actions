@@ -56,7 +56,7 @@ jobs:
   merge_branch:
     name: Merge Branch
     runs-on: ubuntu-latest
-    container: harisekhon/bash-tools
+    container: buluma/bash-tools
     steps:
       - name: Environment
         run: env | sort
