@@ -13,14 +13,12 @@
 
 GitHub Actions master template & GitHub Actions Shared Workflows library.
 
-- [main.yaml](https://github.com/HariSekhon/GitHub-Actions/blob/master/main.yaml) - GitHub Actions master workflow template
-- [.github/workflows/](https://github.com/HariSekhon/GitHub-Actions/tree/master/.github/workflows) - GitHub Actions Reusable Workflows Library
+- [main.yaml](https://github.com/buluma/GitHub-Actions/blob/master/main.yaml) - GitHub Actions master workflow template
+- [.github/workflows/](https://github.com/buluma/GitHub-Actions/tree/master/.github/workflows) - GitHub Actions Reusable Workflows Library
 
 See [Documentation](https://docs.github.com/en/actions/using-workflows/reusing-workflows#calling-a-reusable-workflow) for how to call these workflows directly from your own GitHub Actions workflow.
 
 Fork this repo to have full control over all updates via Pull Requests. Create environment branches to stage updates across dev/staging/production.
-
-Forked from [HariSekhon/Templates](https://github.com/HariSekhon/Templates), for which this is now a submodule.
 
 ## Examples
 
@@ -28,7 +26,7 @@ In your GitHub repo, import these workflows by adding small yaml files to the `.
 
 ### Scan for Secrets and Security issues
 
-[![Semgrep](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/semgrep.yaml/badge.svg)](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/semgrep.yaml)
+[![Semgrep](https://github.com/buluma/GitHub-Actions/actions/workflows/semgrep.yaml/badge.svg)](https://github.com/buluma/GitHub-Actions/actions/workflows/semgrep.yaml)
 Alerts appear under Security -> Code scanning alerts.
 
 Create `.github/workflows/semgrep.yaml`:
@@ -36,7 +34,7 @@ Create `.github/workflows/semgrep.yaml`:
 on: [push]
 jobs:
   semgrep:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/semgrep.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/semgrep.yaml@master
 ```
 
 ### Analyze your Terraform code security & best practices
@@ -49,7 +47,7 @@ Create `.github/workflows/tfsec.yaml`:
 on: [push]
 jobs:
   tfsec:
-    uses: HariSekhon/Gi/tHub-Actions/.github/workflows/tfsec.yaml@master
+    uses: buluma/Gi/tHub-Actions/.github/workflows/tfsec.yaml@master
 ```
 
 ### Docker Build and push to DockerHub
@@ -61,7 +59,7 @@ Create `.github/workflows/docker_build.yaml`:
 on: [push]
 jobs:
   docker_build:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/docker_build.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/docker_build.yaml@master
     with:
       repo: user/repo  # your DockerHub user/repo
       tags: latest v1.1
@@ -77,7 +75,7 @@ Create `.github/workflows/docker_build_aws_ecr.yaml`:
 on: [push]
 jobs:
   docker_build:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/docker_build_aws_ecr.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/docker_build_aws_ecr.yaml@master
     with:
       repo: MY_ECR_REPO
     secrets:
@@ -85,20 +83,20 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 ```
-Creates several useful tags, supports multi-stage build caching, see [README](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/README.md) for details.
+Creates several useful tags, supports multi-stage build caching, see [README](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/README.md) for details.
 
 ### Check for Broken URL Links
 
-[![URL Links](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/url_links.yaml/badge.svg)](https://github.com/HariSekhon/GitHub-Actions/actions/workflows/url_links.yaml)
+[![URL Links](https://github.com/buluma/GitHub-Actions/actions/workflows/url_links.yaml/badge.svg)](https://github.com/buluma/GitHub-Actions/actions/workflows/url_links.yaml)
 
 Create `.github/workflows/url_links.yaml`:
 ```yaml
 on: [push]
 jobs:
   url_links:
-    uses: HariSekhon/GitHub-Actions/.github/workflows/url_links.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/url_links.yaml@master
 ```
-See [README](https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/README.md) for details on ignoring inaccessible / partially constructed links or those containing variables
+See [README](https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/README.md) for details on ignoring inaccessible / partially constructed links or those containing variables
 
 ### Auto-Merge Production hotfixes back to Staging
 
@@ -110,7 +108,7 @@ on: [push]
 jobs:
   merge:
     if: github.ref_name == 'production'
-    uses: HariSekhon/GitHub-Actions/.github/workflows/merge-branch.yaml@master
+    uses: buluma/GitHub-Actions/.github/workflows/merge-branch.yaml@master
     with:
       head: production  # from
       base: staging     # to
