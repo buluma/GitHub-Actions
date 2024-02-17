@@ -9,6 +9,13 @@ on:
         required: false
         default: false
 
+  workflow_dispatch:
+      inputs:
+        debug:
+          type: boolean
+          required: false
+          default: false
+
 permissions:
   contents: read
 
