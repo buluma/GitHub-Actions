@@ -26,7 +26,7 @@ jobs:
       - name: Environment
         run: env | sort
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Polaris Audit
         uses: fairwindsops/polaris@master
