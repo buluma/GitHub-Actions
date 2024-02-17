@@ -14,7 +14,11 @@ name: My Workflow
 # ============================================================================ #
 
 # https://docs.github.com/en/actions/learn-github-actions/environment-variables#default-environment-variables
+
+# XXX: You can now set default environment variables at the repo or organization level:
 #
+# https://docs.github.com/en/actions/learn-github-actions/variables#defining-configuration-variables-for-multiple-workflows
+
 # https://docs.github.com/en/actions/learn-github-actions/contexts#github-context
 #
 # GITHUB_WORKFLOW = name of the workflow (set at top of this file)
@@ -27,12 +31,19 @@ name: My Workflow
 # RUNNER_ARCH
 #
 # XXX: can't reference other environment variable to compose larger ones, must be done as a step based workaround, see Steps section of build further down
+#
+#       https://github.com/github-community/community/discussions/18089
+#
 # XXX: not accessible in 'with' steps or called workflows
+#
+# XXX: Env Vars populated from secrets are automatically masked in the logs
+#
+# XXX: AVOID putting SECRETS in GLOBAL ENVIRONMENT VARIABLES - Secrets are not accessible to 3rd party actions, but environment variables are, restrict to specific steps where they're needed instead
 env:
   repo: bash-tools
   APP: myapp
   ENV: dev
-  DEBUG: ${{ inputs.debug || github.event.inputs.debug || '' }
+  DEBUG: ${{ inputs.debug == true || github.event.inputs.debug == true || '' }}
 
   # or generate dynamic image including the registry, see step section
   DOCKER_IMAGE: myimage
@@ -43,34 +54,39 @@ env:
   # GCP
   #DOCKER_IMAGE: "${{env.GCR_REGISTRY}}/${{env.CLOUDSDK_CORE_PROJECT}}/${{env.APP}}"
   # DockerHub
-  #DOCKER_IMAGE: "buluma/${{env.APP}}"
+  #DOCKER_IMAGE: "harisekhon/${{env.APP}}"
 
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
-  GHCR_REGISTRY: ghcr.io/buluma
+  GITHUB_USER: ${{ secrets.GITHUB_USER }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GHCR_REGISTRY: ghcr.io/harisekhon
+  # for Git Merge branch jobs
+  #
+  GIT_USERNAME: 'GitHub Actions'
+  GIT_EMAIL: 'platform-engineering@MYCOMPANY.CO.UK'
 
+  # should be provided into the environment by aws-actions/configure-aws-credentials
   # or configure via aws-actions/configure-aws-credentials in Setup section
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  GCP_SERVICEACCOUNT_KEY: ${{ secrets.GCP_SERVICEACCOUNT_KEY }}
-  GITHUB_USER: ${{ secrets.GITHUB_USER }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
-
-  AWS_DEFAULT_REGION: eu-west-2  # London
+  CODEARTIFACT_AUTH_TOKEN: ${{ secrets.CODEARTIFACT_AUTH_TOKEN }}
+  #
   # use secrets from Environments as dynamic variables to share workflow across environments
   #AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}  # or generate this from aws access keys (see Generate steps further down)
+  #AWS_DEFAULT_REGION: eu-west-2  # London
   #AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
   #
   # must generate in Steps in order to compose like this
-  #AWS_ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ $AWS_DEFAULT_REGION }}.amazonaws.com
+  #AWS_ECR_REGISTRY: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_DEFAULT_REGION }}.amazonaws.com  # or generate it from ${{ steps.aws-ecr-login.outputs.registry }}
   #DOCKER_IMAGE: ${{ env.AWS_ECR_REGISTRY }}/${{ env.APP }}
   #
   #AWS_DEFAULT_OUTPUT: json
   #AWS_MAX_ATTEMPTS: 3
   #AWS_EKS_CLUSTER: mycluster
 
+  GCP_SERVICEACCOUNT_KEY: ${{ secrets.GCP_SERVICEACCOUNT_KEY }}
   CLOUDSDK_CORE_PROJECT: mycompany-dev
   CLOUDSDK_COMPUTE_REGION: europe-west2
   #CLOUDSDK_COMPUTE_ZONE: "${{env.CLOUDSDK_COMPUTE_REGION}}-a" # or b or c
@@ -84,19 +100,17 @@ env:
   ARGOCD_SERVER: argocd.domain.com
   ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}
 
+  CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+
   ARTIFACTORY_URL: https://artifactory.domain.com:8082/artifactory/
   ARTIFACTORY_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_ACCESS_TOKEN }}
 
   #SELENIUM_HUB_URL: http://x.x.x.x:4444/wd/hub/
   #SELENIUM_HUB_URL: https://x.x.x.x/wd/hub/
 
+  TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
   TF_IN_AUTOMATION: "1"
   TF_WORKSPACE: ${{ env.ENV }}  # run same code against multiple environments
-
-  # for Git Merge branch jobs
-  #
-  GIT_USERNAME: 'GitHub Actions'
-  GIT_EMAIL: 'platform-engineering@MYCOMPANY.CO.UK'
 
   # prevent script injection from inputs - https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-an-intermediate-environment-variable
   SANITIZED_INPUT: ${{ inputs.someuntrusted || github.event.inputs.someuntrusted }}
@@ -111,13 +125,20 @@ on:
   push:
     branches:
       - master
+      - main
       - dev
       - staging
       - production
-      - main
       - '*docker*'  # glob requires quoting, only run on branches with docker in the name
+    tags:
+      - v*
     paths:
       - '*'  # only run when changes have happened on matching paths, this glob misses hidden directories though such as .github/workflows
+      - 'app/**'  # any files under app/
+      - .github/workflows/filename.yaml  # this workflow
+    #paths-ignore:
+    #  #- '**/README.md'
+    #  - '**/*.md'
 
   pull_request:
     branches:
@@ -126,8 +147,18 @@ on:
       - dev
       - staging
       - production
+      - '*docker*'  # glob requires quoting, only run on branches with docker in the name
+    # XXX: if the Pull Request contains any of these files, then every push will re-trigger this build, regardless of whether these files changes since the last push
+    # XXX: WARNING: if this workflow is configured as a Required Check in branch protections but the paths changed in a pull request don't trigger this workflow, then the PR will be blocked indefinitely
+    #               Workaround is to create another check of the same name that does a no-op for all paths to get the PR to pass:
+    #
+    #                 https://docs.github.com/en/enterprise-cloud@latest/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks
     paths:
       - '*'  # only run when changes have happened on matching paths, this glob misses hidden directories though such as .github/workflows
+      - 'app/**'  # any files under app/
+      - .github/workflows/filename.yaml  # this workflow
+    #paths-ignore:
+    #  - **/README.md
 
   # triggered from another workflow for cross-workflow dependencies
   workflow_run:
@@ -149,15 +180,25 @@ on:
         type: string
         required: true
       debug:
+        description: Enable Debug Mode
         type: boolean
         required: false
         default: false
+      #log_level:
+      #  description: Log level
+      #  required: true
+      #  default: warning
+      #  type: choice
+      #  options:
+      #    - info
+      #    - warning
+      #    - debug
     secrets:
-      aws_access_key_id:
+      AWS_ACCESS_KEY_ID:
         required: true
-      aws_secret_access_key:
+      AWS_SECRET_ACCESS_KEY:
         required: true
-      aws_default_region:
+      AWS_DEFAULT_REGION:
         required: true
 
   # https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow#running-a-workflow
@@ -169,20 +210,50 @@ on:
         type: string
         required: true
       debug:
+        # XXX: this still only works as a string comparison ${{ gitihub.events.inputs.debug == 'true' }}
         type: boolean
         required: false
         default: false
 
   schedule:
-    # * is a special character in YAML so you have to quote this string
+    # - min interval is 5 mins
+    # - scheduling may be delayed during periods of high load on GitHub Actions infra, such as at the top of every hour
+    # - '*' is a special character in YAML so you have to quote this string
     - cron: '0 0 * * 1'
+
+# ============================================================================ #
+#                             P e r m i s s i o n s
+# ============================================================================ #
+
+# https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs#assigning-permissions-to-a-specific-job
+
+# use minimal permissions at workflow / jobs level
+permissions:
+  contents: read
+
+  #actions: read|write|none
+  #checks: read|write|none
+  #contents: read|write|none
+  #deployments: read|write|none
+  # kics-scan ignore-line
+  #id-token: read|write|none
+  #issues: read|write|none
+  #discussions: read|write|none
+  #packages: read|write|none
+  #pages: read|write|none
+  #pull-requests: read|write|none
+  #repository-projects: read|write|none
+  #security-events: read|write|none
+  #statuses: read|write|none
 
 
 # ============================================================================ #
 #                             C o n c u r r e n c y
 # ============================================================================ #
 
+# XXX: cancels previous builds that haven't started even if cancel-in-progress is set to false
 concurrency:
+  # XXX: don't set this to the same group in a reusable workflow and calling workflow, that will result in a deadlock
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: false  # build auto-cancellation - enabling this causes false-positive badge failure statuses
 
@@ -192,6 +263,7 @@ concurrency:
 # ============================================================================ #
 
 # doesn't affect imported actions
+# cannot use contexts or expressions under defaults.run
 defaults:
   run:
     # Bash not available on Alpine
@@ -207,16 +279,43 @@ defaults:
 # ============================================================================ #
 
 jobs:
+  call_local_action:
+    uses: ./path/to/dir  # where action.yaml is
+    with:
+      debug: ${{ github.event.inputs.debug }}
+  call_public_action:
+    uses: HariSekhon/GitHub-Actions/path/to/dir@master  # where action.yaml is
+    with:
+      debug: ${{ github.event.inputs.debug }}
+  reusable_workflow:
+    if: github.event.repository.fork == false
+    name: NAME
+    uses: HariSekhon/GitHub-Actions/.github/workflows/some-workflow.yaml@master
+    environment:
+      name: production  # use Environment with approval and different Secrets
+      url: https://domain.com/webapp  # puts a link in the GitHub Actions deployment page
+    with:
+      debug: ${{ github.event.inputs.debug }}
+    # pass all secrets
+    #secrets: inherit
+    # or pass only select secrets
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+      AWS_CODEARTIFACT_DOMAIN: ${{ secrets.AWS_CODEARTIFACT_DOMAIN }}
+
   build:
-    #if: github.event.repository.fork == false
     name: Build
     #needs: [job1, job2]  # dependency jobs
     environment:
       name: production  # use Environment with approval and different Secrets - add this to Deploy stage to allow the build to progress
+      url: https://domain.com/webapp  # puts a link in the GitHub Actions deployment page
     timeout-minutes: 10
 
     # XXX: Conditionals must use single quotes for strings or get an error - Unexpected symbol: '"string"'
-    if: github.ref_name == 'master' || github.ref_name == 'main' || github.ref_name == 'docker'  # stops this workflow running on manual workflow_dispatch on the wrong branch (eg. to stop it invalidating the Docker build cache, update: solved now because I use many tags to cache)
+    # stops this workflow running on manual workflow_dispatch on the wrong branch (eg. to stop it invalidating the Docker build cache, update: solved now because I use many tags to cache)
+    if: ( github.ref_name == 'master' || github.ref_name == 'main' || github.ref_name == 'docker' ) && github.event.repository.fork == false
     #if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
 
     # if triggered from another workflow using workflow_run above, check that workflow succeeded before running
@@ -225,7 +324,7 @@ jobs:
     # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
     permissions:
       contents: read
-      # both needed for code scanning tools to write GitHub Security tab alerts (eg. https://github.com/buluma/GitHub-Actions/blob/master/.github/workflows/tfsec.yaml)
+      # both needed for code scanning tools to write GitHub Security tab alerts (eg. https://github.com/HariSekhon/GitHub-Actions/blob/master/.github/workflows/tfsec.yaml)
       #actions: read
       #security-events: write
 
@@ -246,6 +345,12 @@ jobs:
 #        python-version: ['2.7', '3.7', '3.8', '3.9', '3.10', 'pypy-2.7', 'pypy-3.8']
 #        #node: [6, 8, 10]
     container: centos
+
+    # run on a private container image hosted on GHCR - credentials are the same as would be provided to docker login command
+    #container:
+    #  image: ghcr.io/owner/image
+    #  username: ${{ github.actor }}
+    #  password: ${{ secrets.github_token }}
 
 
     # ============================================================================ #
@@ -317,7 +422,7 @@ jobs:
       #
       # do checkout first so we can generate dynamic environment variables for branch, tags, SHA etc.
       # https://github.com/marketplace/actions/checkout
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         #name: Git Checkout  # better to show the action@version
         with:
           submodules: 'true'  # requires Git 2.18+ to be installed first
@@ -330,10 +435,13 @@ jobs:
       # for OS with Git < 2.18, actions/checkout uses an API download tarball which will screw up your git commands such as 'git submodule init'
       # in these cases, you can emulate the correct checkout behaviour on older versions of Git like so:
       - name: Git Checkout
-        run: git clone "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" "$GITHUB_WORKSPACE"
+        run: git clone "https://${{secrets.GITHUB_TOKEN}}@github.com/$GITHUB_REPOSITORY" "$GITHUB_WORKSPACE"
+
+      - name: Allow Git Commands
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE:-$PWD}"
 
       # checkout another repo
-      #- uses: actions/checkout@v4
+      #- uses: actions/checkout@v3
       #  with:
       #    repository: owner/repo
       #    ref: master
@@ -343,8 +451,9 @@ jobs:
                      #    Error: Repository path '/var/jenkins_home/jenkins' is not under '/__w/Jenkins/Jenkins'
 
       # https://github.com/aws-actions/configure-aws-credentials#configure-aws-credentials-action-for-github-actions
-      - uses: aws-actions/configure-aws-credentials@v1
+      - uses: aws-actions/configure-aws-credentials@v2
         #name: Configure AWS credentials
+        id: configure-aws-credentials  # id is necessary to extract AWS_ACCOUNT_ID further down
         with:
           # https://github.com/aws-actions/configure-aws-credentials/blob/master/action.yml
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -360,12 +469,39 @@ jobs:
       - name: AWS CLI whoami
         run: aws sts get-caller-identity
 
+      # =================
+      # Python + AWS CodeArtifact
+      #
       # https://github.com/marketplace/actions/setup-python
       - uses: actions/setup-python@v2
         #name: Setup Python
         with:
           python-version: '3.x' # Version range or exact version of a Python version to use, using SemVer's version range syntax
           #python-version: ${{ matrix.python-version }}
+
+      # CodeArtifact templated instructions are taken from the "View connection instructions" button in the CodeArtifact repo page
+      #
+      #- name: Configure Pip to default to CodeArtifact
+      #  run: aws codeartifact login --tool pip --repository "${{env.CODEARTIFACT_REPO}}" --domain "${{secrets.CODEARTIFACT_DOMAIN}}" --domain-owner "${{secrets.AWS_ACCOUNT_ID}}"
+      # or
+      - name: Generate environment variable CODEARTIFACT_AUTH_TOKEN (if not already present)
+        # if there is a repo secret generated by a scheduled workflow such as .github/workflows/codeartifact_secret.yaml
+        # then skip generating this every time as generating this new will Cache Bust your Dockerfile
+        if: env.CODEARTIFACT_AUTH_TOKEN == ''
+        # XXX: don't generate env vars with one-liner subshells like this - even with 'set -euo pipefail' the failure of the AWS CLI command won't be detected to error out at this step properly
+        #run: echo "CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token --domain ${{secrets.CODEARTIFACT_DOMAIN}} --domain-owner ${{secrets.AWS_ACCOUNT_ID}} --query authorizationToken --output text)" >> "$GITHUB_ENV"
+        run: |
+          # don't shell trace this step because it will expose the token in the logs before we can mask it
+          set +x
+          CODEARTIFACT_AUTH_TOKEN="$(aws codeartifact get-authorization-token --domain ${{secrets.CODEARTIFACT_DOMAIN}} --domain-owner ${{ secrets.AWS_ACCOUNT_ID}} --query authorizationToken --output text)"
+          echo "CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN" >> "$GITHUB_ENV"
+          echo "::add-mask::$CODEARTIFACT_AUTH_TOKEN"
+
+      # change PIP_INDEX_URL to another variable to not replace default repo but instead use as a supplemental repo via 'pip --extra-index-url "$pip_index_url" requirements.txt' to be able to use PyPI and CodeArtifact at the same time
+      # if using sudo you'll need to preserve the environment variable via 'sudo -e PIP_INDEX_URL'
+      - name: Generate environment variable PIP_INDEX_URL for CodeArtifact
+        run: echo "PIP_INDEX_URL=https://aws:${{env.CODEARTIFACT_AUTH_TOKEN}}@${{secrets.CODEARTIFACT_DOMAIN}}-${{secrets.AWS_ACCOUNT_ID}}.d.codeartifact.${{secrets.AWS_DEFAULT_REGION}}.amazonaws.com/pypi/${{env.CODEARTIFACT_REPO}}/simple/" >> "$GITHUB_ENV"
+      # =================
 
       # https://github.com/marketplace/actions/setup-java-jdk
       - uses: actions/setup-java@v2
@@ -391,9 +527,9 @@ jobs:
       #                                     ... jq ... | tee --append "$GITHUB_ENV"
       #
       # XXX: WARNING: echo/printf suppress subshell failures even with -o pipefail
-      - name: Generate env GITHUB_SHA_SHORT
+      - name: Generate environment variable GITHUB_SHA_SHORT
         run: echo "GITHUB_SHA_SHORT=${GITHUB_SHA:0:6}" >> "$GITHUB_ENV"
-      - name: Generate env GITHUB_REPO
+      - name: Generate environment variable GITHUB_REPO
         run: echo "GITHUB_REPO=${GITHUB_REPOSITORY##*/}" >> "$GITHUB_ENV"
         #
         # step-specific environment variables
@@ -418,7 +554,7 @@ jobs:
         run: yum install -y git make
 
       - name: Git Checkout
-        run: git clone "https://$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY" "$GITHUB_WORKSPACE"
+        run: git clone "https://${{secrets.GITHUB_TOKEN}}@github.com/$GITHUB_REPOSITORY" "$GITHUB_WORKSPACE"
 
       # 'cd' in one step, is ignored in the next step, which ends up back in $GITHUB_WORKSPACE, regardless of whether you inject a new value for $GITHUB_WORKSPACE
 
@@ -441,15 +577,32 @@ jobs:
 
   # Call reusable workflow
   dockerhub_build:
-    name: Docker Build
-    #if: github.event.repository.fork == false
+    name: DockerHub Build
     # XXX: stop this workflow being manually run on other branches if workflow_dispatch is defined
-    if: github.ref_name == 'master' || github.ref_name == 'main' || github.ref_name == 'docker'
-    uses: buluma/GitHub-Actions/.github/workflows/docker_build.yaml@master
+    if: ( github.ref_name == 'master' || github.ref_name == 'main' || github.ref_name == 'docker' ) && github.event.repository.fork == false
+    uses: HariSekhon/GitHub-Actions/.github/workflows/dockerhub_build.yaml@master
     with:
-      repo: buluma/bash-tools
-      tags: alpine
-      dockerfile-repo: buluma/Dockerfiles
+      repo: harisekhon/bash-tools
+      tags: latest ubuntu
+      dockerfile-repo: HariSekhon/Dockerfiles
+      context: Dockerfiles/devops-bash-tools-alpine
+    secrets:
+      DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    permissions:
+      contents: read
+      packages: write
+
+  docker_build_multiple_registries:
+    name: Docker Build
+    # XXX: stop this workflow being manually run on other branches if workflow_dispatch is defined
+    if: ( github.ref_name == 'master' || github.ref_name == 'main' || github.ref_name == 'docker' ) && github.event.repository.fork == false
+    uses: HariSekhon/GitHub-Actions/.github/workflows/docker_build.yaml@master
+    with:
+      repo_tags: |
+        harisekhon/bash-tools:ubuntu
+        ghcr.io/harisekhon/bash-tools:ubuntu
+      dockerfile-repo: HariSekhon/Dockerfiles
       context: Dockerfiles/devops-bash-tools-alpine
     secrets:
       DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
@@ -460,13 +613,12 @@ jobs:
 
   docker_build_aws_ecr:
     name: Docker Build -> AWS ECR
-    #if: github.event.repository.fork == false
     # XXX: stop this workflow being manually run on other branches if workflow_dispatch is defined
-    if: github.ref_name == 'master' || github.ref_name == 'main' || contains(github.ref_name, 'docker')
+    if: ( github.ref_name == 'master' || github.ref_name == 'main' || contains(github.ref_name, 'docker') ) && github.event.repository.fork == false
     # XXX: path must include /.github/workflows/ and @<branch/tag/hashref>, otherwise you may get these errors:
     #       invalid value workflow reference: references to workflows must be rooted in '.github/workflows'
     #       invalid value workflow reference: no version specified
-    uses: buluma/GitHub-Actions/.github/workflows/docker_build_aws_ecr.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/docker_build_aws_ecr.yaml@master
     with:
       #repo: ${{ env.APP }}  # env not accessible here
       repo: MYREPO
@@ -480,7 +632,7 @@ jobs:
       packages: write  # needed for GHCR access if using max-cache: true
 
   docker_build:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: Docker Build
     #needs: [job1, job2]  # dependency jobs
     timeout-minutes: 10
@@ -489,17 +641,21 @@ jobs:
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
     steps:
       # docker/build-push-action does the checkout for you, but if you want to dynamically generate extra tags you need this checkout first
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           submodules: 'true'  # requires Git 2.18+ to be installed first
 
       # XXX: WARNING: echo/printf suppress subshell failures even with -o pipefail
       - name: Generate environment variable AWS_ACCOUNT_ID
         run: |
-          AWS_ACCOUNT_ID="$(aws sts get-caller-identity | jq -r .Account)"
+          #AWS_ACCOUNT_ID="$(aws sts get-caller-identity | jq -r .Account)"
           echo "AWS_ACCOUNT_ID=$AWS_ACCOUNT_ID" >> "$GITHUB_ENV"
+        env:
+          AWS_ACCOUNT_ID: ${{ steps.configure-aws-credentials.outputs.aws-account-id }}
       - name: Generate environment variable AWS_ECR_REGISTRY
         run: echo "AWS_ECR_REGISTRY=${{env.AWS_ACCOUNT_ID}}.dkr.ecr.${{env.AWS_DEFAULT_REGION}}.amazonaws.com" >> "$GITHUB_ENV"
+        # if using aws-actions/amazon-ecr-login step (in which case put this after that step further down)
+        #run: echo "AWS_ECR_REGISTRY=${{ steps.aws-ecr-login.outputs.registry }}" >> "$GITHUB_ENV"
       - name: Generate environment variable GHCR_REGISTRY$
         run: echo "GHCR_REGISTRY=ghcr.io/${{ github.repository_owner }}" >> "$GITHUB_ENV"
       - name: Generate environment variable DOCKER_IMAGE
@@ -514,22 +670,34 @@ jobs:
       # don't need this any more, just use ${{ github.sha }} instead which is more readily available
       # $GITHUB_SHA is shown in environment dump but evaluates to blank, so use our own generated env var instead
       #- name: Generate environment variable GIT_SHA
-      #  run: echo "GIT_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      #  run: |
+      #    GIT_SHA="$(git rev-parse HEAD)"
+      #    echo "GIT_SHA=$GIT_SHA" >> "$GITHUB_ENV"
       #  # this works too
       #  run: echo "GIT_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
 
       # use ${{ github.ref_name }} instead which comes out to the branch or tag (${{github.ref_type}} == 'branch' if you check the github context dump above)
       #- name: Generate environment variable GIT_BRANCH
-      #  run: echo "GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> "$GITHUB_ENV"
+      #  run: |
+      #    GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+      #    echo "GIT_BRANCH=$GIT_BRANCH" >> "$GITHUB_ENV"
       #- name: Generate environment variable GIT_TAG
-      #  run: echo "GIT_TAG=$(git tag --points-at HEAD)" >> "$GITHUB_ENV"
+      #  run: |
+      #    GIT_TAG="$(git tag --points-at HEAD)"
+      #    echo "GIT_TAG=$GIT_TAG" >> "$GITHUB_ENV"
 
       - name: Generate environment variable EPOCH
-        run: echo "EPOCH=$(date --utc '+%s')" >> "$GITHUB_ENV"
+        run: |
+          EPOCH="$(date --utc '+%s')"
+          echo "EPOCH=$EPOCH" >> "$GITHUB_ENV"
       - name: Generate environment variable DATESTAMP
-        run: echo "DATESTAMP=$(date --utc --date="@${{env.EPOCH}}" '+%FT%H%M%SZ')" >> "$GITHUB_ENV"
+        run: |
+          DATESTAMP="$(date --utc --date="@${{env.EPOCH}}" '+%FT%H%M%SZ')"
+          echo "DATESTAMP=$DATESTAMP" >> "$GITHUB_ENV"
       - name: Generate environment variable TIMESTAMP
-        run: echo "TIMESTAMP=$(date --utc --date="@${{env.EPOCH}}" '+%F')" >> "$GITHUB_ENV"
+        run: |
+          TIMESTAMP="$(date --utc --date="@${{env.EPOCH}}" '+%F')"
+          echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_ENV"
 
       # ======== Docker Actions =========
       - name: Set up Docker Buildx
@@ -557,7 +725,7 @@ jobs:
         uses: docker/login-action@v1
         with:
           registry: registry.gitlab.com
-          username: ${{ secrets.GITLAB_USERNAME }}
+          username: ${{ secrets.GITLAB_USER }}
           password: ${{ secrets.GITLAB_PASSWORD }}
 
       # https://github.com/docker/login-action#azure-container-registry-acr
@@ -585,17 +753,24 @@ jobs:
           username: _json_key  # or _json_key_base64 if you base64 encoded the credentials file before upload
           password: ${{ secrets.GAR_JSON_KEY }}  # upload entire downloaded credentials key to GitHub Secrets
 
+      # use credentials from the aws-actions/configure-aws-credentials step
+      # don't need to do this if using the reusable workflow docker_build_aws_ecr.yaml
+      - name: Login to AWS ECR
+        id: aws-ecr-login  # to be able to create environment variable AWS_ECR_REGISTRY from ${{ steps.aws-ecr-login.outputs.registry }}
+        uses: aws-actions/amazon-ecr-login@v1
+      # or
       # https://github.com/docker/login-action#aws-elastic-container-registry-ecr
-      - name: Login to ECR
+      - name: Login to AWS ECR
         uses: docker/login-action@v1
         with:
           #registry: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_DEFAULT_REGION }}.amazonaws.com  # XXX: make sure to set these env vars
           registry: ${{ env.AWS_ECR_REGISTRY }}  # XXX: should be generated by an earlier step
           username: ${{ secrets.AWS_ACCESS_KEY_ID }}
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # if you need to log in to multiple ECR accounts
+          # if you need to log in to multiple ECR accounts, comma separated account IDs
           #env:
-          #  AWS_ACCOUNT_IDS: 012345678910,023456789012
+          #  AWS_ACCOUNT_IDS: ${{env.AWS_ACCOUNT_ID_1}},${{env.AWS_ACCOUNT_ID_2}}
+
 
       # https://github.com/docker/login-action#aws-public-elastic-container-registry-ecr
       - name: Login to Public ECR
@@ -606,6 +781,31 @@ jobs:
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         env:
           AWS_REGION: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Login to Quay.io
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            name/app
+            ghcr.io/username/app
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
 
       # ============
       # Build & Push
@@ -623,6 +823,7 @@ jobs:
           #cache-from: type=local,src=path/to/dir
           #cache-to: type=local,dest=path/to/dir  # XXX: continues to grow, must add a move action afterwards
           #
+          #cache-from: ${{ steps.meta.outputs.tags }}
           cache-from: |
             type=registry,ref=${{env.DOCKER_IMAGE}}:latest
             type=registry,ref=${{env.DOCKER_IMAGE}}:${{github.ref_name}}
@@ -647,6 +848,7 @@ jobs:
           #pull: true  # default: false  # use this or local cache but not both
           push: true  # default: false
           # tags is a CSV or List where List is a newline delimited string
+          #tags: ${{ steps.meta.outputs.tags }}
           tags: |
             ${{env.DOCKER_IMAGE}}:latest
             ${{env.DOCKER_IMAGE}}:${{github.ref_name}}
@@ -658,11 +860,31 @@ jobs:
           #secrets: |
           #    GIT_AUTH_TOKEN=${{ secrets.PAT_TOKEN }}
 
+        # poetry got 403 to private CodeArtifact PyPI regardless of 'build-args:
+        # but a local Docker build of the copied pasted docker command worked
+        # workaround was to deconstruct the official action to straight docker command
+        run: |
+          docker buildx build \
+            --file backend/docker/Dockerfile \
+            --build-arg CODEARTIFACT_AUTH_TOKEN="${{env.CODEARTIFACT_AUTH_TOKEN}}" \
+            --cache-to type=inline \
+            --cache-from type=registry,ref=${{env.DOCKER_IMAGE}}:latest \
+            --cache-from type=registry,ref=${{env.DOCKER_IMAGE}}:${{env.BRANCH_TAG}} \
+            --cache-from type=registry,ref=${{env.DOCKER_IMAGE}}:${{github.sha}} \
+            --tag ${{env.DOCKER_IMAGE}}:latest \
+            --tag ${{env.DOCKER_IMAGE}}:${{env.BRANCH_TAG}} \
+            --tag ${{env.DOCKER_IMAGE}}:${{github.sha}} \
+            --tag ${{env.DOCKER_IMAGE}}:${{env.EPOCH}} \
+            --tag ${{env.DOCKER_IMAGE}}:${{env.DATESTAMP}} \
+            --tag ${{env.DOCKER_IMAGE}}:${{env.TIMESTAMP}} \
+            --push \
+            backend/
+
       # ======== or inline Script =========
-      # or consider using an external script to do all of the below like aws_ecr_docker_build_push.sh from DevOps Bash tools repo - https://github.com/buluma/DevOps-Bash-tools
+      # or consider using an external script to do all of the below like aws_ecr_docker_build_push.sh from DevOps Bash tools repo - https://github.com/HariSekhon/DevOps-Bash-tools
       #
       # see Setup section above for more info
-      - uses: aws-actions/configure-aws-credentials@v1
+      - uses: aws-actions/configure-aws-credentials@v2
         #name: Configure AWS credentials
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -671,11 +893,15 @@ jobs:
 
       # doing this in 2 steps so we can differentiate AWS CLI failures from Docker CLI failures
       - name: AWS ECR password
-        run: echo "AWS_ECR_PASSWORD=$(aws ecr get-login-password --region "${{env.AWS_DEFAULT_REGION}}")" >> "$GITHUB_ENV"
+        run: |
+          set +x  # don't shell trace this step because it will expose the password in the logs
+          AWS_ECR_PASSWORD="$(aws ecr get-login-password --region "${{env.AWS_DEFAULT_REGION}}")"
+          echo "AWS_ECR_PASSWORD=$AWS_ECR_PASSWORD" >> "$GITHUB_ENV"
+          echo "::add-mask::$AWS_ECR_PASSWORD"
       - name: Docker Login ECR
         run: docker login "${{env.AWS_ECR_REGISTRY}}" -u AWS -p "${{env.AWS_ECR_PASSWORD}}"
       - name: Docker Login GHCR
-        run: docker login ghcr.io -u "${{env.GITHUB_USER}}" -p "${{env.GITHUB_TOKEN}}"
+        run: docker login ghcr.io -u "${{secrets.GITHUB_USER}}" -p "${{secrets.GITHUB_TOKEN}}"
 
       # don't split Docker Login to separate job as it may happen on a separate machine, resulting in a docker push error of 'no basic auth credentials'
       # also can't dynamically create AWS_ECR_REGISTRY env var for 2 jobs, would have to set statically in workflow env or duplicate generation in each job
@@ -726,32 +952,34 @@ jobs:
 
       # ======== Scan after build =========
       - name: Docker Scan
-        run: docker scan "${{env.DOCKER_IMAGE}}:latest"  # requires docker-scan-cli plugin (see buluma/DevOps-Bash-tools setup/install_docker_scan.sh)
+        run: docker scan "${{env.DOCKER_IMAGE}}:latest"  # requires docker-scan-cli plugin (see HariSekhon/DevOps-Bash-tools install/install_docker_scan.sh)
 
   # ============================================================================ #
   #                                  D e p l o y
   # ============================================================================ #
 
   deploy:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: Deploy
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: production  # set up Environment 'production' to require approval to wait here
+      url: https://domain.com/webapp  # puts a link in the GitHub Actions deployment page
     timeout-minutes: 10
     steps:
       - name: Deploy
         run: kubectl apply -f ./
 
   argocd:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: ArgoCD Deploy
     needs: build
     runs-on: ubuntu-latest
     container: argoproj/argocd:v2.0.3
     environment:
       name: production  # set up Environment 'production' to require approval to wait here
+      url: https://domain.com/webapp  # puts a link in the GitHub Actions deployment page
     env:
       # or set in global env at top
       ARGOCD_SERVER: argocd.domain.com
@@ -763,6 +991,40 @@ jobs:
       - name: ArgoCD Wait
         run: argocd app wait "$APP" --grpc-web --timeout 600
 
+  elastic_beanstalk:
+    name: Elastic Beanstalk Deploy
+    runs-on: ubuntu-latest
+    container: amazonlinux:2
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        id: configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # Amazon Linux comes with EB CLI pre-installed
+      #
+      #- name: Set up Python 3.9
+      #  uses: actions/setup-python@v2
+      #  with:
+      #    python-version: 3.9
+      #
+      #- name: Install EB CLI
+      #  run: python -m pip install --upgrade pip awsebcli
+
+      # Set AWS Secrets as Elastic Beanstalk Environment Variables or integrate to Secrets Manager
+      - name: Elastic Beanstalk Deploy
+        run: |
+          # the environment contains the settings
+          eb use ${{env.AWS_ELASTIC_BEANSTALK_ENVIRONMENT}} --region ${{ secrets.AWS_DEFAULT_REGION }}
+          # triggers environment update + redeployment of app
+          eb setenv AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} ...
+
+
   # ============================================================================ #
   #                               G i t   M e r g e
   # ============================================================================ #
@@ -770,7 +1032,7 @@ jobs:
   merge_production_to_staging:
     if: github.ref_name == 'production'
     name: Merge Production Branch to Staging Branch (hotfix backports)
-    uses: buluma/GitHub-Actions/.github/workflows/merge-branch.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/merge-branch.yaml@master
     with:
       head: production
       base: staging
@@ -780,18 +1042,29 @@ jobs:
   # ============================================================================ #
 
   validate:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: Validate
-    uses: buluma/GitHub-Actions/.github/workflows/validate.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/validate.yaml@master
+    with:
+      debug: ${{ github.event.inputs.debug }}
+
+  # ============================================================================ #
+  #                               T e r r a f o r m
+  # ============================================================================ #
+
+  terraform:
+    if: github.event.repository.fork == false
+    name: Terraform
+    uses: HariSekhon/GitHub-Actions/.github/workflows/terraform_plan_apply.yaml@master
 
   # ============================================================================ #
   #                                   T F s e c
   # ============================================================================ #
 
   tfsec:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: tfsec
-    uses: buluma/GitHub-Actions/.github/workflows/tfsec.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/tfsec.yaml@master
     permissions:
       actions: read
       contents: read
@@ -799,9 +1072,9 @@ jobs:
 
   # on: [pull_request]
   tfsec_pr_commenter:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: tfsec PR commenter
-    uses: buluma/GitHub-Actions/.github/workflows/tfsec-pr-commenter.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/tfsec-pr-commenter.yaml@master
     permissions:
       actions: read
       contents: read
@@ -812,12 +1085,11 @@ jobs:
   # ============================================================================ #
 
   trivy:
-    #if: github.event.repository.fork == false
     name: Trivy AWS ECR
-    if: github.ref_name == 'main' || contains(github.ref_name, 'docker')
+    if: ( github.ref_name == 'main' || contains(github.ref_name, 'docker') ) && github.event.repository.fork == false
     needs:
       - docker_build
-    uses: buluma/GitHub-Actions/.github/workflows/trivy_aws_ecr.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/trivy_aws_ecr.yaml@master
     with:
       repo: myapp  # will figure out the ECR path from the secrets below
     secrets:
@@ -834,9 +1106,9 @@ jobs:
   # ============================================================================ #
 
   checkov:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: Checkov Scan
-    uses: buluma/GitHub-Actions/.github/workflows/checkov.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/checkov.yaml@master
     #with:
     #  framework: terraform
     permissions:
@@ -849,18 +1121,18 @@ jobs:
   # ============================================================================ #
 
   semgrep:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: Semgrep GitHub Security Tab
-    uses: buluma/GitHub-Actions/.github/workflows/semgrep.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/semgrep.yaml@master
     permissions:
       actions: read
       contents: read
       security-events: write
 
   semgrep_cloud:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: Semgrep Cloud
-    uses: buluma/GitHub-Actions/.github/workflows/semgrep-cloud.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/semgrep-cloud.yaml@master
     secrets:
       SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
@@ -869,9 +1141,9 @@ jobs:
   # ============================================================================ #
 
   reviewdog:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: reviewdog
-    uses: buluma/GitHub-Actions/.github/workflows/reviewdog.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/reviewdog.yaml@master
     permissions:
       actions: read
       contents: read
@@ -879,9 +1151,9 @@ jobs:
 
   # on: [pull_request]
   reviewdog-pr-check:
-    #if: github.event.repository.fork == false
+    if: github.event.repository.fork == false
     name: reviewdog PR
-    uses: buluma/GitHub-Actions/.github/workflows/reviewdog-pr.yaml@master
+    uses: HariSekhon/GitHub-Actions/.github/workflows/reviewdog-pr.yaml@master
     permissions:
       actions: read
       contents: read
@@ -896,13 +1168,13 @@ jobs:
 
     # Cache with matrix
 
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      with:
 #        path: ~/.cache/pip
 #        key: ${{ runner.os }}-pip-bash-tools  # ${{ hashFiles('**/requirements.txt') }}
 #        restore-keys: |
 #          ${{ runner.os }}-pip-
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      with:
 #        path: ~/.cpanm
 #        key: ${{ runner.os }}-cpanm-bash-tools  # ${{ hashFiles('**/cpan-requirements.txt') }}
@@ -911,7 +1183,7 @@ jobs:
 
 # ============================================================================ #
 # Python
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      if: startsWith(runner.os, 'Linux')
 #      with:
 #        path: ~/.cache/pip
@@ -919,7 +1191,7 @@ jobs:
 #        restore-keys: |
 #          ${{ runner.os }}-pip-
 #
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      if: startsWith(runner.os, 'macOS')
 #      with:
 #        path: ~/Library/Caches/pip
@@ -928,7 +1200,7 @@ jobs:
 #          ${{ runner.os }}-pip-
 # ============================================================================
 # Perl
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      with:
 #        path: ~/.cpanm
 #        key: ${{ runner.os }}-cpanm-${{ hashFiles('**/cpan-requirements.txt') }}
@@ -936,7 +1208,7 @@ jobs:
 #          ${{ runner.os }}-cpanm-
 # ============================================================================
 # Go
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      with:
 #        path: ~/go/pkg/mod
 #        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
@@ -944,14 +1216,14 @@ jobs:
 #          ${{ runner.os }}-go-
 # ============================================================================
 # Java / Maven
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      name: Maven Cache
 #      with:
 #        path: ~/.m2/repository
 #        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 #        restore-keys: |
 #          ${{ runner.os }}-maven-
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      name: Maven Wrapper
 #      with:
 #        path: ~/.m2/wrapper
@@ -960,26 +1232,26 @@ jobs:
 #          ${{ runner.os }}-maven-wrapper-
 # ============================================================================
 # Scala / SBT
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      name: SBT Cache
 #      with:
 #        path: ~/.sbt
 #        key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      name: SBT Ivy Cache
 #      with:
 #        path: ~/.ivy2/cache
 #        key: ${{ runner.os }}-sbt-ivy-cache-${{ hashFiles('**/build.sbt') }}
 # ============================================================================
 # Gradle
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      name: Gradle Cache
 #      with:
 #        path: ~/.gradle/caches
 #        key: ${{ runner.os }}-gradle-cache-${{ hashFiles('**/build.gradle') }}
 #        restore-keys: |
 #          ${{ runner.os }}-gradle-cache-
-#    - uses: actions/cache@v1
+#    - uses: actions/cache@v2
 #      name: Gradle Wrapper
 #      with:
 #        path: ~/.gradle/wrapper
@@ -993,7 +1265,7 @@ jobs:
 #      - ubuntu-latest
 #
 #    steps:
-#    - uses: docker://buluma/centos-dev
+#    - uses: docker://harisekhon/centos-dev
 #    -  name: build & test
 #       run: make build test
 
